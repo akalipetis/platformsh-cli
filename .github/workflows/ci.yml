@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  build-php-linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Build PHP
+        run: |
+          mkdir -p legacy/archives/
+          make php
+          make legacy/archives/platform.phar
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          path: |
+            legacy/archives/*
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v3
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path:
+            legacy/archives/
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          install-only: true
+      - name: Build single target binary
+        run: |
+          make single
+      - name: Upload dist
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: |
+            dist/*
