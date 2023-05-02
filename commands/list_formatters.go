@@ -3,7 +3,6 @@ package commands
 import (
 	"bytes"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"strings"
 	"text/tabwriter"
@@ -19,12 +18,6 @@ type JSONFormatter struct{}
 
 func (f *JSONFormatter) Format(list *List) ([]byte, error) {
 	return json.Marshal(list)
-}
-
-type XMLFormatter struct{}
-
-func (f *XMLFormatter) Format(list *List) ([]byte, error) {
-	return xml.Marshal(list)
 }
 
 type TXTFormatter struct{}

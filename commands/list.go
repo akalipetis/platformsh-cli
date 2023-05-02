@@ -20,7 +20,7 @@ func init() {
 }
 
 func init() {
-	ListCmd.Flags().String("format", "txt", "The output format (txt, xml, json, or md) [default: \"txt\"]")
+	ListCmd.Flags().String("format", "txt", "The output format (txt, json, or md) [default: \"txt\"]")
 	ListCmd.Flags().Bool("raw", false, "To output raw command list")
 	ListCmd.Flags().Bool("all", false, "Show all commands, including hidden ones")
 
@@ -89,8 +89,6 @@ var ListCmd = &cobra.Command{
 		switch format {
 		case "json":
 			formatter = &JSONFormatter{}
-		case "xml":
-			formatter = &XMLFormatter{}
 		case "md":
 			formatter = &MDFormatter{}
 		case "txt":
