@@ -27,13 +27,15 @@ var (
 		Description: "Display this application version",
 	}
 	YesOption = InputOption{
-		Name:        "--yes",
-		Shortcut:    "-y",
-		Description: "Answer \"yes\" to confirmation questions; accept the default value for other questions; disable interaction",
+		Name:     "--yes",
+		Shortcut: "-y",
+		Description: "Answer \"yes\" to confirmation questions; " +
+			"accept the default value for other questions; disable interaction",
 	}
 	NoInteractionOption = InputOption{
-		Name:        "--no-interaction",
-		Description: "Do not ask any interactive questions; accept default values. Equivalent to using the environment variable: " + color.YellowString("PLATFORMSH_CLI_NO_INTERACTION=1"),
+		Name: "--no-interaction",
+		Description: "Do not ask any interactive questions; accept default values. " +
+			"Equivalent to using the environment variable: " + color.YellowString("PLATFORMSH_CLI_NO_INTERACTION=1"),
 	}
 	AnsiOption = InputOption{
 		Name:        "--ansi",
@@ -44,9 +46,10 @@ var (
 		Description: "Disable ANSI output",
 	}
 	NoOption = InputOption{
-		Name:        "--no",
-		Shortcut:    "-n",
-		Description: "Answer \"no\" to confirmation questions; accept the default value for other questions; disable interaction",
+		Name:     "--no",
+		Shortcut: "-n",
+		Description: "Answer \"no\" to confirmation questions; " +
+			"accept the default value for other questions; disable interaction",
 	}
 	QuietOption = InputOption{
 		Name:        "--quiet",
