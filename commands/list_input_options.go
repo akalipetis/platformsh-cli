@@ -4,62 +4,95 @@ import (
 	"github.com/fatih/color"
 )
 
-type InputOption struct {
-	Name        string
-	Shortcut    string
-	Description string
-}
-
 var (
-	HelpOption = InputOption{
-		Name:        "--help",
-		Shortcut:    "-h",
-		Description: "Display this help message",
+	HelpOption = Option{
+		Name:            "--help",
+		Shortcut:        "-h",
+		AcceptValue:     false,
+		IsValueRequired: false,
+		IsMultiple:      false,
+		Description:     "Display this help message",
+		Default:         Any{false},
 	}
-	VerboseOption = InputOption{
-		Name:        "--verbose",
-		Shortcut:    "-v|vv|vvv",
-		Description: "Increase the verbosity of messages",
+	VerboseOption = Option{
+		Name:            "--verbose",
+		Shortcut:        "-v|vv|vvv",
+		AcceptValue:     false,
+		IsValueRequired: false,
+		IsMultiple:      false,
+		Description:     "Increase the verbosity of messages",
+		Default:         Any{false},
 	}
-	VersionOption = InputOption{
-		Name:        "--version",
-		Shortcut:    "-V",
-		Description: "Display this application version",
+	VersionOption = Option{
+		Name:            "--version",
+		Shortcut:        "-V",
+		AcceptValue:     false,
+		IsValueRequired: false,
+		IsMultiple:      false,
+		Description:     "Display this application version",
+		Default:         Any{false},
 	}
-	YesOption = InputOption{
-		Name:     "--yes",
-		Shortcut: "-y",
+	YesOption = Option{
+		Name:            "--yes",
+		Shortcut:        "-y",
+		AcceptValue:     false,
+		IsValueRequired: false,
+		IsMultiple:      false,
 		Description: "Answer \"yes\" to confirmation questions; " +
 			"accept the default value for other questions; disable interaction",
+		Default: Any{false},
 	}
-	NoInteractionOption = InputOption{
-		Name: "--no-interaction",
+	NoInteractionOption = Option{
+		Name:            "--no-interaction",
+		Shortcut:        "",
+		AcceptValue:     false,
+		IsValueRequired: false,
+		IsMultiple:      false,
 		Description: "Do not ask any interactive questions; accept default values. " +
 			"Equivalent to using the environment variable: " + color.YellowString("PLATFORMSH_CLI_NO_INTERACTION=1"),
+		Default: Any{false},
 	}
-	AnsiOption = InputOption{
-		Name:        "--ansi",
-		Description: "Force ANSI output",
+	AnsiOption = Option{
+		Name:            "--ansi",
+		Shortcut:        "",
+		AcceptValue:     false,
+		IsValueRequired: false,
+		IsMultiple:      false,
+		Description:     "Force ANSI output",
+		Default:         Any{false},
 	}
-	NoAnsiOption = InputOption{
-		Name:        "--no-ansi",
-		Description: "Disable ANSI output",
+	NoAnsiOption = Option{
+		Name:            "--no-ansi",
+		Shortcut:        "",
+		AcceptValue:     false,
+		IsValueRequired: false,
+		IsMultiple:      false,
+		Description:     "Disable ANSI output",
+		Default:         Any{false},
 	}
-	NoOption = InputOption{
-		Name:     "--no",
-		Shortcut: "-n",
+	NoOption = Option{
+		Name:            "--no",
+		Shortcut:        "-n",
+		AcceptValue:     false,
+		IsValueRequired: false,
+		IsMultiple:      false,
 		Description: "Answer \"no\" to confirmation questions; " +
 			"accept the default value for other questions; disable interaction",
+		Default: Any{false},
 	}
-	QuietOption = InputOption{
-		Name:        "--quiet",
-		Shortcut:    "-q",
-		Description: "Do not output any message",
+	QuietOption = Option{
+		Name:            "--quiet",
+		Shortcut:        "-q",
+		AcceptValue:     false,
+		IsValueRequired: false,
+		IsMultiple:      false,
+		Description:     "Do not output any message",
+		Default:         Any{false},
 	}
 )
 
 var (
-	GlobalOptions = []InputOption{
+	GlobalOptions = []Option{
 		HelpOption,
 		VerboseOption,
 		VersionOption,

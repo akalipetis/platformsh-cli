@@ -27,11 +27,9 @@ func init() {
 	viper.BindPFlags(ListCmd.Flags()) //nolint:errcheck
 }
 
-const projectNamespace = "project"
-
 var ListCmd = &cobra.Command{
 	Use:   "list [flags] [namespace]",
-	Short: "List",
+	Short: "Lists commands",
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		var b bytes.Buffer
@@ -50,6 +48,9 @@ var ListCmd = &cobra.Command{
 		}
 
 		arguments := []string{"list", "--format=json"}
+		if viper.GetBool("all") {
+			arguments = append(arguments, "--all")
+		}
 		if len(args) > 0 {
 			arguments = append(arguments, args[0])
 		}
@@ -73,29 +74,24 @@ var ListCmd = &cobra.Command{
 			return
 		}
 
-		if !list.DescribesNamespace() || list.Namespace == projectNamespace {
-			list.AddCommand(projectNamespace, ProjectInitCommand)
+		if !list.DescribesNamespace() || list.Namespace == ProjectInitCommand.Name.Namespace {
+			list.AddCommand(&ProjectInitCommand)
 		}
 
 		format := viper.GetString("format")
 		raw := viper.GetBool("raw")
-		all := viper.GetBool("all")
 
-		if !all {
-			list.RemoveHiddenCommands()
-		}
-
-		var formatter Formatter
+		var formatter Formatter[*List]
 		switch format {
 		case "json":
-			formatter = &JSONFormatter{}
+			formatter = &JSONListFormatter{}
 		case "md":
-			formatter = &MDFormatter{}
+			formatter = &MDListFormatter{}
 		case "txt":
 			if raw {
-				formatter = &RawFormatter{}
+				formatter = &RawListFormatter{}
 			} else {
-				formatter = &TXTFormatter{}
+				formatter = &TXTListFormatter{}
 			}
 		default:
 			debugLog("%s\n", color.RedString("Unsupported format \"%s\".", format))
