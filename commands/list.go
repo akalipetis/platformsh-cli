@@ -94,8 +94,19 @@ var ListCmd = &cobra.Command{
 				formatter = &TXTListFormatter{}
 			}
 		default:
-			debugLog("%s\n", color.RedString("Unsupported format \"%s\".", format))
-			os.Exit(1)
+			c.Stdout = cmd.OutOrStdout()
+			arguments := []string{"list", "--format=" + format}
+			if err := c.Exec(cmd.Context(), arguments...); err != nil {
+				debugLog("%s\n", color.RedString(err.Error()))
+				exitCode := 1
+				var execErr *exec.ExitError
+				if errors.As(err, &execErr) {
+					exitCode = execErr.ExitCode()
+				}
+				//nolint:errcheck
+				c.Cleanup()
+				os.Exit(exitCode)
+			}
 			return
 		}
 
