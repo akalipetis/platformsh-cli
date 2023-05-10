@@ -59,7 +59,7 @@ func (f *TXTListFormatter) Format(list *List) ([]byte, error) {
 	sort.Strings(namespaces)
 
 	for _, namespace := range namespaces {
-		if namespace != "" {
+		if !list.DescribesNamespace() && namespace != "" {
 			fmt.Fprintln(writer, color.YellowString("%s\t", namespace))
 		}
 		for _, cmd := range cmds[namespace] {
@@ -119,11 +119,20 @@ func (f *MDListFormatter) Format(list *List) ([]byte, error) {
 		b.H2(md.Code(cmd.Name.String()))
 		b.Paragraph(cmd.Description).Ln()
 
+		if len(cmd.Usage) > 1 {
+			aliases := make([]string, 0, len(cmd.Usage[1:]))
+			for _, alias := range cmd.Usage[1:] {
+				aliases = append(aliases, md.Code(alias))
+			}
+			b.Paragraph("Aliases: " + strings.Join(aliases, ", ")).Ln()
+		}
+
 		b.H3("Usage")
-		for _, u := range cmd.Usage {
-			b.ListItem(md.Code(u))
+		if len(cmd.Usage[0]) > 0 {
+			b.CodeBlock(cmd.Usage[0])
 		}
 		b.Ln()
+
 		if cmd.Help != "" {
 			b.Paragraph(cmd.Help).Ln()
 		}
@@ -132,28 +141,39 @@ func (f *MDListFormatter) Format(list *List) ([]byte, error) {
 			b.H3("Arguments")
 			for pair := cmd.Definition.Arguments.Oldest(); pair != nil; pair = pair.Next() {
 				arg := pair.Value
-				b.H4(md.Code(arg.Name))
-				b.Paragraph(arg.Description).Ln()
-				b.ListItem(fmt.Sprintf("Is required: %s", arg.IsRequired))
-				b.ListItem(fmt.Sprintf("Is array: %s", arg.IsArray))
-				b.ListItem(fmt.Sprintf("Default: %s", md.Code(arg.Default.String())))
-				b.Ln()
+				line := md.Code(arg.Name)
+				opts := make([]string, 0, 2)
+				if arg.IsRequired {
+					opts = append(opts, "required")
+				} else {
+					opts = append(opts, "optional")
+				}
+				if arg.IsArray {
+					opts = append(opts, "multiple values allowed")
+				}
+				line += "(" + strings.Join(opts, "; ") + ")"
+
+				b.ListItem(line)
+				if arg.Description != "" {
+					b.Paragraph("  " + arg.Description).Ln()
+				}
 			}
 		}
 
 		b.H3("Options")
 		for pair := cmd.Definition.Options.Oldest(); pair != nil; pair = pair.Next() {
 			opt := pair.Value
-			name := opt.Name
+			line := md.Code(opt.Name)
 			if opt.Shortcut != "" {
-				name += "|" + opt.Shortcut
+				line += " (" + md.Code(opt.Shortcut) + ")"
 			}
-			b.H4(md.Code(name))
-			b.Paragraph(opt.Description).Ln()
-			b.ListItem(fmt.Sprintf("Accept value: %s", opt.AcceptValue))
-			b.ListItem(fmt.Sprintf("Is value required: %s", opt.IsValueRequired))
-			b.ListItem(fmt.Sprintf("Is multiple: %s", opt.IsMultiple))
-			b.ListItem(fmt.Sprintf("Default: %s", md.Code(opt.Default.String())))
+			if opt.AcceptValue {
+				line += " (expects a value)"
+			}
+			b.ListItem(line)
+			if opt.Description != "" {
+				b.Paragraph("  " + opt.Description)
+			}
 			b.Ln()
 		}
 	}

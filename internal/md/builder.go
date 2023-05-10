@@ -50,21 +50,12 @@ func (b *Builder) Ln() *Builder {
 	return b.ln()
 }
 
-func (b *Builder) ListItem(s string) *Builder {
-	return b.write(UnorderedListItem(s))
+func (b *Builder) CodeBlock(s string) *Builder {
+	return b.write(CodeBlock(s))
 }
 
-func (b *Builder) UnorderedList(list []string, fn ...func(s string) string) *Builder {
-	if len(list) == 0 {
-		return b
-	}
-	for _, s := range list {
-		if len(fn) != 0 {
-			s = fn[0](s)
-		}
-		b.write(UnorderedListItem(s))
-	}
-	return b
+func (b *Builder) ListItem(s string) *Builder {
+	return b.write(UnorderedListItem(s))
 }
 
 func (b *Builder) heading(level HeadingLevel, s string) *Builder {

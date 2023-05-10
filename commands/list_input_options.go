@@ -13,6 +13,7 @@ var (
 		IsMultiple:      false,
 		Description:     "Display this help message",
 		Default:         Any{false},
+		Hidden:          false,
 	}
 	VerboseOption = Option{
 		Name:            "--verbose",
@@ -22,6 +23,7 @@ var (
 		IsMultiple:      false,
 		Description:     "Increase the verbosity of messages",
 		Default:         Any{false},
+		Hidden:          false,
 	}
 	VersionOption = Option{
 		Name:            "--version",
@@ -31,6 +33,7 @@ var (
 		IsMultiple:      false,
 		Description:     "Display this application version",
 		Default:         Any{false},
+		Hidden:          false,
 	}
 	YesOption = Option{
 		Name:            "--yes",
@@ -41,6 +44,7 @@ var (
 		Description: "Answer \"yes\" to confirmation questions; " +
 			"accept the default value for other questions; disable interaction",
 		Default: Any{false},
+		Hidden:  false,
 	}
 	NoInteractionOption = Option{
 		Name:            "--no-interaction",
@@ -51,6 +55,7 @@ var (
 		Description: "Do not ask any interactive questions; accept default values. " +
 			"Equivalent to using the environment variable: " + color.YellowString("PLATFORMSH_CLI_NO_INTERACTION=1"),
 		Default: Any{false},
+		Hidden:  false,
 	}
 	AnsiOption = Option{
 		Name:            "--ansi",
@@ -60,6 +65,7 @@ var (
 		IsMultiple:      false,
 		Description:     "Force ANSI output",
 		Default:         Any{false},
+		Hidden:          true,
 	}
 	NoAnsiOption = Option{
 		Name:            "--no-ansi",
@@ -69,6 +75,7 @@ var (
 		IsMultiple:      false,
 		Description:     "Disable ANSI output",
 		Default:         Any{false},
+		Hidden:          true,
 	}
 	NoOption = Option{
 		Name:            "--no",
@@ -79,6 +86,7 @@ var (
 		Description: "Answer \"no\" to confirmation questions; " +
 			"accept the default value for other questions; disable interaction",
 		Default: Any{false},
+		Hidden:  true,
 	}
 	QuietOption = Option{
 		Name:            "--quiet",
@@ -88,6 +96,7 @@ var (
 		IsMultiple:      false,
 		Description:     "Do not output any message",
 		Default:         Any{false},
+		Hidden:          true,
 	}
 )
 

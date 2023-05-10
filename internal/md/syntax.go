@@ -51,6 +51,13 @@ func Code(s string) string {
 	return "`" + s + "`"
 }
 
+func CodeBlock(s string) string {
+	if s == "" {
+		return ""
+	}
+	return "```\n" + s + "\n```"
+}
+
 func Link(text, url string) string {
 	if text == "" || url == "" {
 		return ""

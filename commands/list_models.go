@@ -20,10 +20,10 @@ var (
 			"platform project:init",
 			"ify",
 		},
-		Description: "Initialize the project",
+		Description: "Initialize a project",
 		Help:        "",
 		Definition: Definition{
-			Arguments: nil,
+			Arguments: &orderedmap.OrderedMap[string, Argument]{},
 			Options: orderedmap.New[string, Option](orderedmap.WithInitialData[string, Option](
 				orderedmap.Pair[string, Option]{
 					Key:   HelpOption.GetName(),
@@ -44,22 +44,6 @@ var (
 				orderedmap.Pair[string, Option]{
 					Key:   NoInteractionOption.GetName(),
 					Value: NoInteractionOption,
-				},
-				orderedmap.Pair[string, Option]{
-					Key:   AnsiOption.GetName(),
-					Value: AnsiOption,
-				},
-				orderedmap.Pair[string, Option]{
-					Key:   NoAnsiOption.GetName(),
-					Value: NoAnsiOption,
-				},
-				orderedmap.Pair[string, Option]{
-					Key:   NoOption.GetName(),
-					Value: NoOption,
-				},
-				orderedmap.Pair[string, Option]{
-					Key:   QuietOption.GetName(),
-					Value: QuietOption,
 				},
 			)),
 		},
@@ -126,39 +110,8 @@ func (n *CommandName) UnmarshalJSON(text []byte) error {
 }
 
 type Definition struct {
-	Arguments *Arguments                             `json:"arguments"`
-	Options   *orderedmap.OrderedMap[string, Option] `json:"options"`
-}
-
-// Arguments is a custom type of "orderedmap.OrderedMap[string, Argument]" that we need
-// for the one reason only - to support the Legacy-CLI behavior. The Legacy-CLI can return
-// both an empty array and an object/map in the "arguments" field. This type can be
-// deleted and replaced with map[string]Argument in Definition structure when
-// the json-schema will be fixed in the Legacy-CLI.
-type Arguments struct {
-	orderedmap.OrderedMap[string, Argument]
-}
-
-func (a *Arguments) MarshalJSON() ([]byte, error) {
-	if a.Len() == 0 {
-		return []byte("[]"), nil
-	}
-	return json.Marshal(&a.OrderedMap)
-}
-
-func (a *Arguments) UnmarshalJSON(text []byte) error {
-	if string(text) == "[]" {
-		return nil
-	}
-
-	var arguments orderedmap.OrderedMap[string, Argument]
-	err := json.Unmarshal(text, &arguments)
-	if err != nil {
-		return err
-	}
-	*a = Arguments{OrderedMap: arguments}
-
-	return nil
+	Arguments *orderedmap.OrderedMap[string, Argument] `json:"arguments"`
+	Options   *orderedmap.OrderedMap[string, Option]   `json:"options"`
 }
 
 type Argument struct {
@@ -177,6 +130,7 @@ type Option struct {
 	IsMultiple      YesNo  `json:"is_multiple"`
 	Description     string `json:"description"`
 	Default         Any    `json:"default"`
+	Hidden          bool   `json:"hidden"`
 }
 
 func (o *Option) GetName() string {
