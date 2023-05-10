@@ -1,12 +1,15 @@
 package commands
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/fatih/color"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
@@ -49,6 +52,8 @@ var (
 		},
 		Hidden: false,
 	}
+	regexColor = regexp.MustCompile(`<((?:fg=(?P<fg>\w+);?)?(?:bg=(?P<bg>\w+);?)?(?:options=(?P<options>\w+);?)?)?>(?P<label>.*?)</>`)
+	regexTag   = regexp.MustCompile(`<.*?>`)
 )
 
 type List struct {
@@ -66,8 +71,8 @@ type Application struct {
 type Command struct {
 	Name        CommandName `json:"name"`
 	Usage       []string    `json:"usage"` // + aliases
-	Description string      `json:"description"`
-	Help        string      `json:"help"`
+	Description CleanString `json:"description"`
+	Help        CleanString `json:"help"`
 	Definition  Definition  `json:"definition"`
 	Hidden      bool        `json:"hidden"`
 }
@@ -109,28 +114,87 @@ func (n *CommandName) UnmarshalJSON(text []byte) error {
 	return nil
 }
 
+type CleanString string
+
+func (s CleanString) String() string {
+	return string(s)
+}
+
+func (s *CleanString) MarshalJSON() ([]byte, error) {
+	buff := new(bytes.Buffer)
+	encoder := json.NewEncoder(buff)
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(s.String())
+	return buff.Bytes(), err
+}
+
+func (s *CleanString) UnmarshalJSON(text []byte) error {
+	var str string
+	err := json.Unmarshal(text, &str)
+	if err != nil {
+		return err
+	}
+
+	match := regexColor.FindStringSubmatch(str)
+	if len(match) != 0 {
+		res := make(map[string]string)
+		for i, name := range regexColor.SubexpNames() {
+			if i != 0 && name != "" {
+				res[name] = match[i]
+			}
+		}
+
+		atrs := make([]color.Attribute, 0, 2)
+		switch res["fg"] {
+		case "white":
+			atrs = append(atrs, color.FgWhite)
+		case "red":
+			atrs = append(atrs, color.FgRed)
+		case "yellow":
+			atrs = append(atrs, color.FgYellow)
+		}
+		switch res["bg"] {
+		case "white":
+			atrs = append(atrs, color.BgWhite)
+		case "red":
+			atrs = append(atrs, color.BgRed)
+		case "yellow":
+			atrs = append(atrs, color.BgYellow)
+		}
+		colorStr := color.New(atrs...).SprintFunc()
+
+		str = regexColor.ReplaceAllString(str, colorStr(res["label"]))
+	}
+
+	// Remove all remain tags like <comment></comment> and <info></info>
+	str = regexTag.ReplaceAllString(str, "")
+
+	*s = CleanString(str)
+	return nil
+}
+
 type Definition struct {
 	Arguments *orderedmap.OrderedMap[string, Argument] `json:"arguments"`
 	Options   *orderedmap.OrderedMap[string, Option]   `json:"options"`
 }
 
 type Argument struct {
-	Name        string `json:"name"`
-	IsRequired  YesNo  `json:"is_required"`
-	IsArray     YesNo  `json:"is_array"`
-	Description string `json:"description"`
-	Default     Any    `json:"default"`
+	Name        string      `json:"name"`
+	IsRequired  YesNo       `json:"is_required"`
+	IsArray     YesNo       `json:"is_array"`
+	Description CleanString `json:"description"`
+	Default     Any         `json:"default"`
 }
 
 type Option struct {
-	Name            string `json:"name"`
-	Shortcut        string `json:"shortcut"`
-	AcceptValue     YesNo  `json:"accept_value"`
-	IsValueRequired YesNo  `json:"is_value_required"`
-	IsMultiple      YesNo  `json:"is_multiple"`
-	Description     string `json:"description"`
-	Default         Any    `json:"default"`
-	Hidden          bool   `json:"hidden"`
+	Name            string      `json:"name"`
+	Shortcut        string      `json:"shortcut"`
+	AcceptValue     YesNo       `json:"accept_value"`
+	IsValueRequired YesNo       `json:"is_value_required"`
+	IsMultiple      YesNo       `json:"is_multiple"`
+	Description     CleanString `json:"description"`
+	Default         Any         `json:"default"`
+	Hidden          bool        `json:"hidden"`
 }
 
 func (o *Option) GetName() string {

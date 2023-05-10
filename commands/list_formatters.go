@@ -20,7 +20,11 @@ type Formatter[T any] interface {
 type JSONListFormatter struct{}
 
 func (f *JSONListFormatter) Format(list *List) ([]byte, error) {
-	return json.Marshal(list)
+	buff := new(bytes.Buffer)
+	encoder := json.NewEncoder(buff)
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(list)
+	return buff.Bytes(), err
 }
 
 type TXTListFormatter struct{}
@@ -67,7 +71,7 @@ func (f *TXTListFormatter) Format(list *List) ([]byte, error) {
 			if len(cmd.Usage) > 1 {
 				name = name + " (" + strings.Join(cmd.Usage[1:], ", ") + ")"
 			}
-			fmt.Fprintf(writer, "  %s\t%s\n", name, cmd.Description)
+			fmt.Fprintf(writer, "  %s\t%s\n", name, cmd.Description.String())
 		}
 	}
 	writer.Flush()
@@ -81,7 +85,7 @@ func (f *RawListFormatter) Format(list *List) ([]byte, error) {
 	var b bytes.Buffer
 	writer := tabwriter.NewWriter(&b, 0, 8, 16, ' ', 0)
 	for _, cmd := range list.Commands {
-		fmt.Fprintf(writer, "%s\t%s\n", cmd.Name.String(), cmd.Description)
+		fmt.Fprintf(writer, "%s\t%s\n", cmd.Name.String(), cmd.Description.String())
 	}
 	writer.Flush()
 
@@ -117,7 +121,7 @@ func (f *MDListFormatter) Format(list *List) ([]byte, error) {
 
 	for _, cmd := range list.Commands {
 		b.H2(md.Code(cmd.Name.String()))
-		b.Paragraph(cmd.Description).Ln()
+		b.Paragraph(cmd.Description.String()).Ln()
 
 		if len(cmd.Usage) > 1 {
 			aliases := make([]string, 0, len(cmd.Usage[1:]))
@@ -134,7 +138,7 @@ func (f *MDListFormatter) Format(list *List) ([]byte, error) {
 		b.Ln()
 
 		if cmd.Help != "" {
-			b.Paragraph(cmd.Help).Ln()
+			b.Paragraph(cmd.Help.String()).Ln()
 		}
 
 		if cmd.Definition.Arguments != nil && cmd.Definition.Arguments.Len() > 0 {
@@ -155,7 +159,7 @@ func (f *MDListFormatter) Format(list *List) ([]byte, error) {
 
 				b.ListItem(line)
 				if arg.Description != "" {
-					b.Paragraph("  " + arg.Description).Ln()
+					b.Paragraph("  " + arg.Description.String()).Ln()
 				}
 			}
 		}
@@ -172,7 +176,7 @@ func (f *MDListFormatter) Format(list *List) ([]byte, error) {
 			}
 			b.ListItem(line)
 			if opt.Description != "" {
-				b.Paragraph("  " + opt.Description)
+				b.Paragraph("  " + opt.Description.String())
 			}
 			b.Ln()
 		}

@@ -52,8 +52,8 @@ var (
 		AcceptValue:     false,
 		IsValueRequired: false,
 		IsMultiple:      false,
-		Description: "Do not ask any interactive questions; accept default values. " +
-			"Equivalent to using the environment variable: " + color.YellowString("PLATFORMSH_CLI_NO_INTERACTION=1"),
+		Description: CleanString("Do not ask any interactive questions; accept default values. " +
+			"Equivalent to using the environment variable: " + color.YellowString("PLATFORMSH_CLI_NO_INTERACTION=1")),
 		Default: Any{false},
 		Hidden:  false,
 	}
