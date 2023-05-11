@@ -178,7 +178,6 @@ func (f *MDListFormatter) Format(list *List) ([]byte, error) {
 			if opt.Description != "" {
 				b.Paragraph("  " + opt.Description.String())
 			}
-			b.Ln()
 		}
 	}
 
