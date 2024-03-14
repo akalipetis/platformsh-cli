@@ -2,30 +2,31 @@ package commands
 
 import (
 	"bytes"
-	"errors"
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/symfony-cli/console"
 
 	"github.com/platformsh/cli/internal/config"
 	"github.com/platformsh/cli/internal/legacy"
 )
 
-func newCompletionCommand(cnf *config.Config) *cobra.Command {
-	return &cobra.Command{
-		Use:   "completion",
-		Short: "Print the completion script for your shell",
-		Args:  cobra.MaximumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+func completionCommand(cnf *config.Config) *console.Command {
+	return &console.Command{
+		Name:  "completion",
+		Usage: "Print the completion script for your shell",
+		Args: console.ArgDefinition{
+			&console.Arg{Name: "shell_type", Optional: true},
+		},
+		Action: func(ctx *console.Context) error {
 			completionArgs := []string{"_completion", "-g", "--program", cnf.Application.Executable}
-			if len(args) > 0 {
-				completionArgs = append(completionArgs, "--shell-type", args[0])
+			if shellType := ctx.Args().Get("shell_type"); shellType != "" {
+				completionArgs = append(completionArgs, "--shell-type", shellType)
 			}
 			var b bytes.Buffer
 			c := &legacy.CLIWrapper{
@@ -34,25 +35,18 @@ func newCompletionCommand(cnf *config.Config) *cobra.Command {
 				CustomPharPath: viper.GetString("phar-path"),
 				Debug:          viper.GetBool("debug"),
 				Stdout:         &b,
-				Stderr:         cmd.ErrOrStderr(),
-				Stdin:          cmd.InOrStdin(),
+				Stderr:         os.Stderr,
+				Stdin:          os.Stdin,
 			}
 
 			if err := c.Init(); err != nil {
 				debugLog("%s\n", color.RedString(err.Error()))
-				os.Exit(1)
-				return
+				return fmt.Errorf("Cannot initialize Legacy CLI: %w", err)
 			}
 
-			if err := c.Exec(cmd.Context(), completionArgs...); err != nil {
+			if err := c.Exec(context.Background(), completionArgs...); err != nil {
 				debugLog("%s\n", color.RedString(err.Error()))
-				exitCode := 1
-				var execErr *exec.ExitError
-				if errors.As(err, &execErr) {
-					exitCode = execErr.ExitCode()
-				}
-				os.Exit(exitCode)
-				return
+				return fmt.Errorf("Failed to run completion command: %w", err)
 			}
 
 			completions := strings.ReplaceAll(
@@ -64,8 +58,9 @@ func newCompletionCommand(cnf *config.Config) *cobra.Command {
 				path.Base(c.PharPath()),
 				cnf.Application.Executable,
 			)
-			fmt.Fprintln(cmd.OutOrStdout(), "#compdef "+cnf.Application.Executable)
-			fmt.Fprintln(cmd.OutOrStdout(), completions)
+			fmt.Fprintln(os.Stdout, "#compdef "+cnf.Application.Executable)
+			fmt.Fprintln(os.Stdout, completions)
+			return nil
 		},
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 
@@ -344,6 +345,43 @@ func (y YesNo) String() string {
 
 type Any struct {
 	any
+}
+
+func (a *Any) StringDefault() string {
+	if a.any == nil {
+		return ""
+	}
+
+	switch value := a.any.(type) {
+	case string:
+		return value
+	case int:
+		return strconv.Itoa(value)
+	case float64:
+		return strconv.FormatFloat(value, 'f', 0, 64)
+	}
+
+	if value, ok := a.any.(string); ok {
+		return value
+	}
+
+	if value, ok := a.any.(int); ok {
+		return strconv.Itoa(value)
+	}
+
+	return ""
+}
+
+func (a *Any) BoolDefault() bool {
+	if a.any == nil {
+		return false
+	}
+
+	if value, ok := a.any.(bool); ok {
+		return value
+	}
+
+	return false
 }
 
 func (a *Any) String() string {
