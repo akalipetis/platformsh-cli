@@ -2,132 +2,51 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 
-	"github.com/fatih/color"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/platformsh/cli/internal/config"
 	"github.com/platformsh/cli/internal/legacy"
 )
 
-func newListCommand(cnf *config.Config) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "list [flags] [namespace]",
-		Short: "Lists commands",
-		Args:  cobra.MaximumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			var b bytes.Buffer
-			c := &legacy.CLIWrapper{
-				Config:         cnf,
-				Version:        version,
-				CustomPharPath: viper.GetString("phar-path"),
-				Debug:          viper.GetBool("debug"),
-				Stdout:         &b,
-				Stderr:         cmd.ErrOrStderr(),
-				Stdin:          cmd.InOrStdin(),
-			}
-			if err := c.Init(); err != nil {
-				debugLog("%s\n", color.RedString(err.Error()))
-				os.Exit(1)
-				return
-			}
-
-			arguments := []string{"list", "--format=json"}
-			if viper.GetBool("all") {
-				arguments = append(arguments, "--all")
-			}
-			if len(args) > 0 {
-				arguments = append(arguments, args[0])
-			}
-			if err := c.Exec(cmd.Context(), arguments...); err != nil {
-				debugLog("%s\n", color.RedString(err.Error()))
-				exitCode := 1
-				var execErr *exec.ExitError
-				if errors.As(err, &execErr) {
-					exitCode = execErr.ExitCode()
-				}
-				os.Exit(exitCode)
-				return
-			}
-
-			var list List
-			if err := json.Unmarshal(b.Bytes(), &list); err != nil {
-				debugLog("%s\n", color.RedString(err.Error()))
-				os.Exit(1)
-				return
-			}
-
-			// Override the application name and executable with our own config.
-			list.Application.Name = cnf.Application.Name
-			list.Application.Executable = cnf.Application.Executable
-
-			projectInitCommand := innerProjectInitCommand(cnf)
-
-			if !list.DescribesNamespace() || list.Namespace == projectInitCommand.Name.Namespace {
-				list.AddCommand(&projectInitCommand)
-			}
-
-			appConfigValidateCommand := innerAppConfigValidateCommand(cnf)
-
-			if !list.DescribesNamespace() || list.Namespace == appConfigValidateCommand.Name.Namespace {
-				list.AddCommand(&appConfigValidateCommand)
-			}
-
-			format := viper.GetString("format")
-			raw := viper.GetBool("raw")
-
-			var formatter Formatter
-			switch format {
-			case "json":
-				formatter = &JSONListFormatter{}
-			case "md":
-				formatter = &MDListFormatter{}
-			case "txt":
-				if raw {
-					formatter = &RawListFormatter{}
-				} else {
-					formatter = &TXTListFormatter{}
-				}
-			default:
-				c.Stdout = cmd.OutOrStdout()
-				arguments := []string{"list", "--format=" + format}
-				if err := c.Exec(cmd.Context(), arguments...); err != nil {
-					debugLog("%s\n", color.RedString(err.Error()))
-					exitCode := 1
-					var execErr *exec.ExitError
-					if errors.As(err, &execErr) {
-						exitCode = execErr.ExitCode()
-					}
-					os.Exit(exitCode)
-				}
-				return
-			}
-
-			result, err := formatter.Format(&list, config.FromContext(cmd.Context()))
-			if err != nil {
-				debugLog("%s\n", color.RedString(err.Error()))
-				os.Exit(1)
-				return
-			}
-
-			fmt.Fprintln(cmd.OutOrStdout(), string(result))
-		},
+func listLegacyCommands(ctx context.Context, cnf *config.Config, category string, all bool) (*List, error) {
+	arguments := []string{"list", "--format=json"}
+	if all {
+		arguments = append(arguments, "--all")
+	}
+	if category != "" {
+		arguments = append(arguments, category)
 	}
 
-	cmd.Flags().String("format", "txt", "The output format (txt, json, or md) [default: \"txt\"]")
-	cmd.Flags().Bool("raw", false, "To output raw command list")
-	cmd.Flags().Bool("all", false, "Show all commands, including hidden ones")
+	var b bytes.Buffer
+	c := &legacy.CLIWrapper{
+		Config:         cnf,
+		Version:        version,
+		CustomPharPath: viper.GetString("phar-path"),
+		Debug:          viper.GetBool("debug"),
+		Stdout:         &b,
+		Stderr:         nil,
+		Stdin:          nil,
+	}
 
-	viper.BindPFlags(cmd.Flags()) //nolint:errcheck
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		cmd.Root().Run(cmd.Root(), append([]string{"help", "list"}, args...))
-	})
+	if err := c.Init(); err != nil {
+		return nil, fmt.Errorf("could not initialize legacy CLI: %w", err)
+	}
 
-	return cmd
+	if err := c.Exec(ctx, arguments...); err != nil {
+		return nil, fmt.Errorf("could not list legacy CLI commands: %w", err)
+	}
+
+	list := &List{}
+	if err := json.Unmarshal(b.Bytes(), list); err != nil {
+		return nil, fmt.Errorf("could not parse legacy CLI command list: %w", err)
+	}
+
+	list.Application.Name = cnf.Application.Name
+	list.Application.Executable = cnf.Application.Executable
+
+	return list, nil
 }

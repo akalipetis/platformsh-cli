@@ -33,7 +33,7 @@ type TXTListFormatter struct{}
 func (f *TXTListFormatter) Format(list *List, cnf *config.Config) ([]byte, error) {
 	var b bytes.Buffer
 	writer := tabwriter.NewWriter(&b, 0, 8, 1, ' ', 0)
-	fmt.Fprintf(writer, "%s %s\n", list.Application.Name, color.GreenString(list.Application.Version))
+	fmt.Fprintf(writer, "%s %s\n", list.Application.Name, color.GreenString(version))
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, color.YellowString("Global options:"))
 	for _, opt := range globalOptions(cnf) {

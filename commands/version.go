@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/symfony-cli/console"
 
 	"github.com/platformsh/cli/internal/config"
 	"github.com/platformsh/cli/internal/legacy"
@@ -18,12 +18,11 @@ var (
 	builtBy = "local"
 )
 
-func newVersionCommand(cnf *config.Config) *cobra.Command {
-	return &cobra.Command{
-		Use:                "version",
-		Short:              "Print the version number of the " + cnf.Application.Name,
-		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
-		Run: func(cmd *cobra.Command, args []string) {
+func newVersionCommand(cnf *config.Config) *console.Command {
+	return &console.Command{
+		Name:  "version",
+		Usage: "Print the version number of the " + cnf.Application.Name,
+		Action: func(ctx *console.Context) error {
 			fmt.Fprintf(color.Output, "%s %s\n", cnf.Application.Name, color.CyanString(version))
 
 			if viper.GetBool("verbose") {
@@ -45,6 +44,7 @@ func newVersionCommand(cnf *config.Config) *cobra.Command {
 					color.CyanString(builtBy),
 				)
 			}
+			return nil
 		},
 	}
 }

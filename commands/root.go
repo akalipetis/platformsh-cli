@@ -2,26 +2,24 @@ package commands
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
+	"slices"
 	"strings"
+	"text/tabwriter"
+	"text/template"
 
-	"github.com/fatih/color"
-	"github.com/platformsh/platformify/commands"
 	"github.com/platformsh/platformify/vendorization"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
+	"github.com/symfony-cli/console"
 
-	"github.com/platformsh/cli/internal"
 	"github.com/platformsh/cli/internal/config"
 	"github.com/platformsh/cli/internal/legacy"
 )
+
+var overrideCommands = []string{"list", "help"}
 
 // Execute is the main entrypoint to run the CLI.
 func Execute(cnf *config.Config) error {
@@ -33,202 +31,210 @@ func Execute(cnf *config.Config) error {
 		ServiceName:  cnf.Service.Name,
 		DocsBaseURL:  cnf.Service.DocsURL,
 	}
+	console.CommandHelpTemplate = `<comment>Command:</> {{.FullName}}
+{{if .Aliases}}<comment>Aliases:</> {{joinAliases .Aliases ", "}}
+{{end}}{{if .Usage}}<comment>Description:</> {{.Usage}}
 
-	ctx := vendorization.WithVendorAssets(config.ToContext(context.Background(), cnf), assets)
-	return newRootCommand(cnf, assets).ExecuteContext(ctx)
-}
+{{end}}<comment>Usage:</>
+  {{.HelpName}}{{if .VisibleFlags}} [options]{{end}}{{.Arguments.Usage}}{{if .Arguments}}
 
-func newRootCommand(cnf *config.Config, assets *vendorization.VendorAssets) *cobra.Command {
-	var (
-		updateMessageChan = make(chan *internal.ReleaseInfo, 1)
-		versionCommand    = newVersionCommand(cnf)
-	)
-	cmd := &cobra.Command{
-		Use:                cnf.Application.Executable,
-		Short:              cnf.Application.Name,
-		Args:               cobra.ArbitraryArgs,
-		DisableFlagParsing: false,
-		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
-		SilenceUsage:       true,
-		SilenceErrors:      true,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if viper.GetBool("version") {
-				versionCommand.Run(cmd, []string{})
-				os.Exit(0)
-			}
-			if cnf.Wrapper.GitHubRepo != "" {
-				go func() {
-					rel, _ := internal.CheckForUpdate(cnf, version)
-					updateMessageChan <- rel
-				}()
-			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
-			c := &legacy.CLIWrapper{
-				Config:         cnf,
-				Version:        version,
-				CustomPharPath: viper.GetString("phar-path"),
-				Debug:          viper.GetBool("debug"),
-				Stdout:         cmd.OutOrStdout(),
-				Stderr:         cmd.ErrOrStderr(),
-				Stdin:          cmd.InOrStdin(),
-			}
-			if err := c.Init(); err != nil {
-				debugLog("%s\n", color.RedString(err.Error()))
-				os.Exit(1)
-				return
-			}
+<comment>Arguments:</>
+  {{range .Arguments}}{{.}}
+  {{end}}{{end}}{{if .VisibleFlags}}
 
-			if err := c.Exec(cmd.Context(), os.Args[1:]...); err != nil {
-				debugLog("%s\n", color.RedString(err.Error()))
-				exitCode := 1
-				var execErr *exec.ExitError
-				if errors.As(err, &execErr) {
-					exitCode = execErr.ExitCode()
+<comment>Options:</>
+  {{range .VisibleFlags}}{{.}}
+  {{end}}{{end}}{{if .Description}}
+
+<comment>Help:</>
+  {{.Description}}
+{{end}}
+`
+	console.HelpPrinter = func(out io.Writer, templ string, data interface{}) {
+		funcMap := template.FuncMap{
+			"join": strings.Join,
+			"joinAliases": func(aliases []*console.Alias, sep string) string {
+				aliasesStr := make([]string, 0, len(aliases))
+				for _, a := range aliases {
+					aliasesStr = append(aliasesStr, a.String())
 				}
-				os.Exit(exitCode)
-			}
-		},
-		PersistentPostRun: func(cmd *cobra.Command, args []string) {
-			checkShellConfigLeftovers(cnf)
-			select {
-			case rel := <-updateMessageChan:
-				printUpdateMessage(rel, cnf)
-			default:
-			}
-		},
-	}
 
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		if cmd.Context() == nil {
-			cmd.SetContext(context.Background())
+				return strings.Join(aliasesStr, sep)
+			},
 		}
 
-		if !slices.Contains(args, "--help") && !slices.Contains(args, "-h") {
-			args = append([]string{"help"}, args...)
-		}
+		w := tabwriter.NewWriter(out, 1, 8, 2, ' ', 0)
+		t := template.Must(template.New("help").Funcs(funcMap).Parse(templ))
 
-		cmd.Run(cmd, args)
-	})
-
-	cmd.PersistentFlags().BoolP("version", "V", false, fmt.Sprintf("Displays the %s version", cnf.Application.Name))
-	cmd.PersistentFlags().String("phar-path", "",
-		fmt.Sprintf("Uses a local .phar file for the Legacy %s", cnf.Application.Name),
-	)
-	cmd.PersistentFlags().Bool("debug", false, "Enable debug logging")
-	cmd.PersistentFlags().Bool("no-interaction", false, "Enable non-interactive mode")
-	cmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose output")
-
-	projectInitCmd := commands.NewPlatformifyCmd(assets)
-	projectInitCmd.SetHelpFunc(func(_ *cobra.Command, args []string) {
-		internalCmd := innerProjectInitCommand(cnf)
-		fmt.Println(internalCmd.HelpPage(cnf))
-	})
-
-	validateCmd := commands.NewValidateCommand(assets)
-	validateCmd.Use = "app:config-validate"
-	validateCmd.Aliases = []string{"validate"}
-	validateCmd.SetHelpFunc(func(_ *cobra.Command, args []string) {
-		internalCmd := innerAppConfigValidateCommand(cnf)
-		fmt.Println(internalCmd.HelpPage(cnf))
-	})
-
-	// Add subcommands.
-	cmd.AddCommand(
-		newCompletionCommand(cnf),
-		newHelpCommand(cnf),
-		newListCommand(cnf),
-		projectInitCmd,
-		validateCmd,
-		versionCommand,
-	)
-
-	//nolint:errcheck
-	viper.BindPFlags(cmd.PersistentFlags())
-
-	return cmd
-}
-
-// checkShellConfigLeftovers checks .zshrc and .bashrc for any leftovers from the legacy CLI
-func checkShellConfigLeftovers(cnf *config.Config) {
-	start := fmt.Sprintf("# BEGIN SNIPPET: %s configuration", cnf.Application.Name)
-	end := "# END SNIPPET"
-	shellConfigSnippet := regexp.MustCompile(regexp.QuoteMeta(start) + "(?s).+?" + regexp.QuoteMeta(end))
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return
-	}
-
-	shellConfigFiles := []string{
-		filepath.Join(homeDir, ".zshrc"),
-		filepath.Join(homeDir, ".bashrc"),
-	}
-
-	for _, shellConfigFile := range shellConfigFiles {
-		if _, err := os.Stat(shellConfigFile); err != nil {
-			continue
-		}
-
-		shellConfig, err := os.ReadFile(shellConfigFile)
+		err := t.Execute(w, data)
 		if err != nil {
+			panic(fmt.Errorf("CLI TEMPLATE ERROR: %#v", err.Error()))
+		}
+		w.Flush()
+	}
+
+	// ctx := vendorization.WithVendorAssets(config.ToContext(context.Background(), cnf), assets)
+	app, err := newApp(cnf, assets)
+	if err != nil {
+		return err
+	}
+	return app.Run(os.Args)
+}
+
+func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Application, error) {
+	legacyAction := func(ctx *console.Context) error {
+		var legacyErr error
+		defer func() {
+			if legacyErr != nil {
+			}
+		}()
+
+		c := &legacy.CLIWrapper{
+			Config:         cnf,
+			Version:        version,
+			CustomPharPath: viper.GetString("phar-path"),
+			Debug:          viper.GetBool("debug"),
+			Stdout:         os.Stdout,
+			Stderr:         os.Stderr,
+			Stdin:          os.Stdin,
+		}
+		if legacyErr = c.Init(); legacyErr != nil {
+			debugLog("failed to initialize legacy CLI: %s", legacyErr)
+			return nil
+		}
+
+		if legacyErr := c.Exec(context.TODO(), os.Args[1:]...); legacyErr != nil {
+			debugLog("failed to run legacy CLI command: %s", legacyErr)
+			return nil
+		}
+
+		return nil
+	}
+
+	list, err := listLegacyCommands(context.TODO(), cnf, "", true)
+	if err != nil {
+		return nil, err
+	}
+
+	console.VersionFlag = &console.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"V"},
+		Usage:   console.VersionFlag.Usage,
+	}
+	globalFlags := []console.Flag{
+		console.VersionFlag,
+		console.LogLevelFlag,
+		console.QuietFlag,
+		console.NoInteractionFlag,
+		console.AnsiFlag,
+		console.NoAnsiFlag,
+		console.HelpFlag,
+		console.VerbosityFlag("verbose", "v", "v"),
+	}
+
+	cmds := make([]*console.Command, 0, len(list.Commands))
+	for _, legacyCmd := range list.Commands {
+		if legacyCmd.Name.Namespace == "" && slices.Contains(overrideCommands, legacyCmd.Name.Command) {
 			continue
 		}
 
-		if shellConfigSnippet.Match(shellConfig) {
-			fmt.Fprintf(color.Error, "%s Your %s file contains code that is no longer needed for the New %s\n",
-				color.YellowString("Warning:"),
-				shellConfigFile,
-				cnf.Application.Name,
-			)
-			fmt.Fprintf(color.Error, "%s %s\n", color.YellowString("Please remove the following lines from:"), shellConfigFile)
-			fmt.Fprintf(color.Error, "\t%s\n", strings.ReplaceAll(string(shellConfigSnippet.Find(shellConfig)), "\n", "\n\t"))
+		cmd := &console.Command{
+			Name:        legacyCmd.Name.Command,
+			Usage:       legacyCmd.Description.String(),
+			Description: legacyCmd.Help.String(),
+			Category:    legacyCmd.Name.Namespace,
+			Action:      legacyAction,
 		}
+		if legacyCmd.Hidden {
+			cmd.Hidden = console.Hide
+		}
+
+		for _, alias := range legacyCmd.Aliases {
+			cmd.Aliases = append(cmd.Aliases, &console.Alias{
+				Name: alias,
+			})
+		}
+
+		for pair := legacyCmd.Definition.Arguments.Oldest(); pair != nil; pair = pair.Next() {
+			cmd.Args = append(cmd.Args, &console.Arg{
+				Name:        pair.Value.Name,
+				Description: pair.Value.Description.String(),
+				Optional:    true,
+				Slice:       bool(pair.Value.IsArray),
+			})
+		}
+
+		for pair := legacyCmd.Definition.Options.Oldest(); pair != nil; pair = pair.Next() {
+			isGlobal := false
+			for _, fl := range globalFlags {
+				if fl.Names()[0] == pair.Key {
+					isGlobal = true
+				}
+			}
+			if isGlobal {
+				continue
+			}
+
+			if !pair.Value.AcceptValue {
+				flag := &console.BoolFlag{
+					Name:         strings.TrimPrefix(pair.Value.Name, "--"),
+					Hidden:       pair.Value.Hidden,
+					Usage:        pair.Value.Description.String(),
+					Required:     false,
+					DefaultValue: pair.Value.Default.BoolDefault(),
+				}
+
+				if pair.Value.Shortcut != "" {
+					flag.Aliases = []string{strings.TrimPrefix(pair.Value.Shortcut, "-")}
+				}
+				cmd.Flags = append(cmd.Flags, flag)
+				continue
+			}
+
+			if pair.Value.IsMultiple {
+				flag := &console.StringSliceFlag{
+					Name:     strings.TrimPrefix(pair.Value.Name, "--"),
+					Hidden:   pair.Value.Hidden,
+					Usage:    pair.Value.Description.String(),
+					Required: false,
+				}
+				if pair.Value.Shortcut != "" {
+					flag.Aliases = []string{strings.TrimPrefix(pair.Value.Shortcut, "-")}
+				}
+				cmd.Flags = append(cmd.Flags, flag)
+				continue
+			}
+
+			flag := &console.StringFlag{
+				Name:         strings.TrimPrefix(pair.Value.Name, "--"),
+				Hidden:       pair.Value.Hidden,
+				Usage:        pair.Value.Description.String(),
+				Required:     false,
+				DefaultValue: pair.Value.Default.StringDefault(),
+			}
+			if pair.Value.Shortcut != "" {
+				flag.Aliases = []string{strings.TrimPrefix(pair.Value.Shortcut, "-")}
+			}
+			cmd.Flags = append(cmd.Flags, flag)
+		}
+
+		cmds = append(cmds, cmd)
 	}
-}
 
-func printUpdateMessage(newRelease *internal.ReleaseInfo, cnf *config.Config) {
-	if newRelease == nil {
-		return
-	}
-
-	fmt.Fprintf(color.Error, "\n\n%s %s → %s\n",
-		color.YellowString(fmt.Sprintf("A new release of the %s is available:", cnf.Application.Name)),
-		color.CyanString(version),
-		color.CyanString(newRelease.Version),
-	)
-
-	executable, err := os.Executable()
-	if err == nil && cnf.Wrapper.HomebrewTap != "" && isUnderHomebrew(executable) {
-		fmt.Fprintf(
-			color.Error,
-			"To upgrade, run: brew update && brew upgrade %s\n",
-			color.YellowString(cnf.Wrapper.HomebrewTap),
-		)
-	} else if cnf.Wrapper.GitHubRepo != "" {
-		fmt.Fprintf(
-			color.Error,
-			"To upgrade, follow the instructions at: https://github.com/%s#upgrade\n",
-			cnf.Wrapper.GitHubRepo,
-		)
-	}
-
-	fmt.Fprintf(color.Error, "%s\n\n", color.YellowString(newRelease.URL))
-}
-
-func isUnderHomebrew(binary string) bool {
-	brewExe, err := exec.LookPath("brew")
-	if err != nil {
-		return false
-	}
-
-	brewPrefixBytes, err := exec.Command(brewExe, "--prefix").Output()
-	if err != nil {
-		return false
-	}
-
-	brewBinPrefix := filepath.Join(strings.TrimSpace(string(brewPrefixBytes)), "bin") + string(filepath.Separator)
-	return strings.HasPrefix(binary, brewBinPrefix)
+	return &console.Application{
+		Name:        cnf.Application.Name,
+		HelpName:    cnf.Application.Executable,
+		Usage:       "",
+		Version:     version,
+		Channel:     "",
+		Description: "",
+		Commands: append(
+			cmds,
+			projectInitCommand(assets),
+			validateCommand(assets),
+			completionCommand(cnf),
+		),
+	}, nil
 }
 
 func debugLog(format string, v ...any) {
