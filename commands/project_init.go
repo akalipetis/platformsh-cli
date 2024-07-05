@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/platformsh/platformify/commands"
 	"github.com/platformsh/platformify/vendorization"
@@ -17,7 +18,7 @@ func projectInitCommand(assets *vendorization.VendorAssets) *console.Command {
 		Description: "Create the starter YAML files for your project",
 		Category:    "project",
 		Action: func(ctx *console.Context) error {
-			return commands.Platformify(context.Background(), assets)
+			return commands.Platformify(context.Background(), os.Stdout, os.Stderr, assets)
 		},
 	}
 }
