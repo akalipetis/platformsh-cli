@@ -6,12 +6,12 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path"
 
 	"github.com/gofrs/flock"
+	"github.com/symfony-cli/terminal"
 
 	"github.com/platformsh/cli/internal/config"
 )
@@ -75,7 +75,6 @@ type CLIWrapper struct {
 	Config         *config.Config
 	Version        string
 	CustomPharPath string
-	Debug          bool
 }
 
 func (c *CLIWrapper) cacheDir() string {
@@ -85,7 +84,7 @@ func (c *CLIWrapper) cacheDir() string {
 // Init the CLI wrapper, creating a temporary directory and copying over files
 func (c *CLIWrapper) Init() error {
 	if _, err := os.Stat(c.cacheDir()); os.IsNotExist(err) {
-		c.debugLog("cache directory does not exist, creating: %s", c.cacheDir())
+		terminal.Logger.Debug().Msgf("cache directory does not exist, creating: %s", c.cacheDir())
 		if err := os.Mkdir(c.cacheDir(), 0o700); err != nil {
 			return fmt.Errorf("could not create temporary directory: %w", err)
 		}
@@ -94,7 +93,7 @@ func (c *CLIWrapper) Init() error {
 	if err := fileLock.Lock(); err != nil {
 		return fmt.Errorf("could not acquire lock: %w", err)
 	}
-	c.debugLog("lock acquired: %s", fileLock.Path())
+	terminal.Logger.Debug().Msgf("lock acquired: %s", fileLock.Path())
 	//nolint:errcheck
 	defer fileLock.Unlock()
 
@@ -103,7 +102,7 @@ func (c *CLIWrapper) Init() error {
 			return fmt.Errorf("legacy CLI phar file not found: %w", err)
 		}
 
-		c.debugLog("phar file does not exist, copying: %s", c.PharPath())
+		terminal.Logger.Debug().Msgf("phar file does not exist, copying: %s", c.PharPath())
 		if err := copyFile(c.PharPath(), phar); err != nil {
 			return fmt.Errorf("could not copy phar file: %w", err)
 		}
@@ -125,7 +124,7 @@ func (c *CLIWrapper) Init() error {
 	}
 
 	if _, err := os.Stat(c.PHPPath()); os.IsNotExist(err) {
-		c.debugLog("PHP binary does not exist, copying: %s", c.PHPPath())
+		terminal.Logger.Debug().Msgf("PHP binary does not exist, copying: %s", c.PHPPath())
 		if err := c.copyPHP(); err != nil {
 			return fmt.Errorf("could not copy files: %w", err)
 		}
@@ -166,17 +165,15 @@ func (c *CLIWrapper) Exec(ctx context.Context, args ...string) error {
 		envPrefix+"APPLICATION_PROMPT_SELF_INSTALL=0",
 		envPrefix+"WRAPPED=1",
 		envPrefix+"APPLICATION_VERSION="+c.Version,
+		fmt.Sprintf(
+			"%sUSER_AGENT={APP_NAME_DASH}/%s ({UNAME_S}; {UNAME_R}; PHP %s; WRAPPER %s)",
+			envPrefix,
+			LegacyCLIVersion,
+			PHPVersion,
+			c.Version,
+		),
 	)
-	if c.Debug {
-		cmd.Env = append(cmd.Env, envPrefix+"CLI_DEBUG=1")
-	}
-	cmd.Env = append(cmd.Env, fmt.Sprintf(
-		"%sUSER_AGENT={APP_NAME_DASH}/%s ({UNAME_S}; {UNAME_R}; PHP %s; WRAPPER %s)",
-		envPrefix,
-		LegacyCLIVersion,
-		PHPVersion,
-		c.Version,
-	))
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("could not run legacy CLI command: %w", err)
 	}
@@ -196,11 +193,4 @@ func (c *CLIWrapper) PharPath() string {
 // ConfigPath returns the path to the YAML config file that will be provided to the legacy CLI.
 func (c *CLIWrapper) ConfigPath() string {
 	return path.Join(c.cacheDir(), "config.yaml")
-}
-
-// debugLog logs a debugging message, if debug is enabled
-func (c *CLIWrapper) debugLog(msg string, v ...any) {
-	if c.Debug {
-		log.Printf(msg, v...)
-	}
 }
