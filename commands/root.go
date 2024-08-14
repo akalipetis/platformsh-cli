@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"slices"
 	"strings"
@@ -12,8 +11,8 @@ import (
 	"text/template"
 
 	"github.com/platformsh/platformify/vendorization"
-	"github.com/spf13/viper"
 	"github.com/symfony-cli/console"
+	"github.com/symfony-cli/terminal"
 
 	"github.com/platformsh/cli/internal/config"
 	"github.com/platformsh/cli/internal/legacy"
@@ -73,7 +72,6 @@ func Execute(cnf *config.Config) error {
 		w.Flush()
 	}
 
-	// ctx := vendorization.WithVendorAssets(config.ToContext(context.Background(), cnf), assets)
 	app, err := newApp(cnf, assets)
 	if err != nil {
 		return err
@@ -83,28 +81,21 @@ func Execute(cnf *config.Config) error {
 
 func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Application, error) {
 	legacyAction := func(ctx *console.Context) error {
-		var legacyErr error
-		defer func() {
-			if legacyErr != nil {
-			}
-		}()
-
 		c := &legacy.CLIWrapper{
 			Config:         cnf,
 			Version:        version,
-			CustomPharPath: viper.GetString("phar-path"),
-			Debug:          viper.GetBool("debug"),
+			CustomPharPath: ctx.String("phar-path"),
 			Stdout:         os.Stdout,
 			Stderr:         os.Stderr,
 			Stdin:          os.Stdin,
 		}
-		if legacyErr = c.Init(); legacyErr != nil {
-			debugLog("failed to initialize legacy CLI: %s", legacyErr)
-			return nil
+		if legacyErr := c.Init(); legacyErr != nil {
+			terminal.Logger.Debug().Msgf("failed to initialize legacy CLI: %s", legacyErr)
+			return fmt.Errorf("Failed to initialize legacy CLI")
 		}
 
 		if legacyErr := c.Exec(context.TODO(), os.Args[1:]...); legacyErr != nil {
-			debugLog("failed to run legacy CLI command: %s", legacyErr)
+			terminal.Logger.Debug().Msgf("failed to run legacy CLI command: %s", legacyErr)
 			return nil
 		}
 
@@ -222,25 +213,24 @@ func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Ap
 	}
 
 	return &console.Application{
-		Name:        cnf.Application.Name,
-		HelpName:    cnf.Application.Executable,
-		Usage:       "",
-		Version:     version,
-		Channel:     "",
-		Description: "",
+		Name:          cnf.Application.Name,
+		HelpName:      cnf.Application.Executable,
+		Usage:         "",
+		Version:       version,
+		Channel:       channel,
+		Description:   "",
+		FlagEnvPrefix: []string{strings.TrimRight(cnf.Application.EnvPrefix, "_")},
 		Commands: append(
 			cmds,
 			projectInitCommand(assets),
 			validateCommand(assets),
-			completionCommand(cnf),
+			newVersionCommand(cnf),
 		),
+		Flags: []console.Flag{
+			&console.StringFlag{
+				Name:  "phar-path",
+				Usage: "Use a custom legacy CLI by providing its path in your filesystem",
+			},
+		},
 	}, nil
-}
-
-func debugLog(format string, v ...any) {
-	if !viper.GetBool("debug") {
-		return
-	}
-
-	log.Printf(format, v...)
 }

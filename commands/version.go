@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
-	"github.com/spf13/viper"
 	"github.com/symfony-cli/console"
+	"github.com/symfony-cli/terminal"
 
 	"github.com/platformsh/cli/internal/config"
 	"github.com/platformsh/cli/internal/legacy"
@@ -13,8 +13,9 @@ import (
 
 var (
 	version = "0.0.0"
-	commit  = "local"
+	channel = "dev"
 	date    = ""
+	commit  = "local"
 	builtBy = "local"
 )
 
@@ -22,10 +23,9 @@ func newVersionCommand(cnf *config.Config) *console.Command {
 	return &console.Command{
 		Name:  "version",
 		Usage: "Print the version number of the " + cnf.Application.Name,
-		Action: func(ctx *console.Context) error {
+		Action: func(_ *console.Context) error {
 			fmt.Fprintf(color.Output, "%s %s\n", cnf.Application.Name, color.CyanString(version))
-
-			if viper.GetBool("verbose") {
+			if terminal.GetLogLevel() > 1 {
 				fmt.Fprintf(
 					color.Output,
 					"Embedded PHP version %s\n",

@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
+	"github.com/spf13/viper"
 
 	"github.com/platformsh/cli/commands"
 	"github.com/platformsh/cli/internal/config"
@@ -22,6 +24,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	viper.SetEnvPrefix(strings.TrimSuffix(cnf.Application.EnvPrefix, "_"))
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	viper.AutomaticEnv()
 
 	if err := commands.Execute(cnf); err != nil {
 		os.Exit(1)

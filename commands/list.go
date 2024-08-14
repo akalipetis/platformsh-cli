@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/spf13/viper"
-
 	"github.com/platformsh/cli/internal/config"
 	"github.com/platformsh/cli/internal/legacy"
 )
@@ -23,13 +21,11 @@ func listLegacyCommands(ctx context.Context, cnf *config.Config, category string
 
 	var b bytes.Buffer
 	c := &legacy.CLIWrapper{
-		Config:         cnf,
-		Version:        version,
-		CustomPharPath: viper.GetString("phar-path"),
-		Debug:          viper.GetBool("debug"),
-		Stdout:         &b,
-		Stderr:         nil,
-		Stdin:          nil,
+		Config:  cnf,
+		Version: version,
+		Stdout:  &b,
+		Stderr:  nil,
+		Stdin:   nil,
 	}
 
 	if err := c.Init(); err != nil {

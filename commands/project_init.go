@@ -17,7 +17,7 @@ func projectInitCommand(assets *vendorization.VendorAssets) *console.Command {
 		Usage:       fmt.Sprintf("%s project:init [options]", assets.Binary),
 		Description: "Create the starter YAML files for your project",
 		Category:    "project",
-		Action: func(ctx *console.Context) error {
+		Action: func(_ *console.Context) error {
 			return commands.Platformify(context.Background(), os.Stdout, os.Stderr, assets)
 		},
 	}
