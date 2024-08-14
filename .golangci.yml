@@ -42,6 +42,8 @@ linters-settings:
   prealloc:
     # Report preallocation suggestions on for loops, false by default
     for-loops: true
+  stylecheck:
+    checks: ["all", "-ST1005"]
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
