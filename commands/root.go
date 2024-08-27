@@ -49,6 +49,13 @@ func Execute(cnf *config.Config) error {
   {{.Description}}
 {{end}}
 `
+
+	examplesTemplate := fmt.Sprintf(`<comment>Examples:</>
+  {{range .Examples}}{{.Description}}
+		<info>%s {{$.Name}} {{.Commandline}}</>
+  {{end}}
+`, cnf.Application.Executable)
+
 	console.HelpPrinter = func(out io.Writer, templ string, data interface{}) {
 		funcMap := template.FuncMap{
 			"join": strings.Join,
@@ -64,10 +71,23 @@ func Execute(cnf *config.Config) error {
 
 		w := tabwriter.NewWriter(out, 1, 8, 2, ' ', 0)
 		t := template.Must(template.New("help").Funcs(funcMap).Parse(templ))
+		et := template.Must(template.New("examples").Funcs(funcMap).Parse(examplesTemplate))
 
 		err := t.Execute(w, data)
 		if err != nil {
 			panic(fmt.Errorf("CLI TEMPLATE ERROR: %#v", err.Error()))
+		}
+		if cmd, ok := data.(*console.Command); ok {
+			list, err := listLegacyCommands(context.Background(), cnf, cmd.Category, true)
+			if err != nil {
+				return
+			}
+
+			for _, legacyCmd := range list.Commands {
+				if cmd.Name == legacyCmd.Name.Command && len(legacyCmd.Examples) > 0 {
+					et.Execute(w, legacyCmd)
+				}
+			}
 		}
 		w.Flush()
 	}
@@ -110,7 +130,7 @@ func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Ap
 	console.VersionFlag = &console.BoolFlag{
 		Name:    "version",
 		Aliases: []string{"V"},
-		Usage:   console.VersionFlag.Usage,
+		Usage:   "Display the CLI version",
 	}
 	globalFlags := []console.Flag{
 		console.VersionFlag,
@@ -121,6 +141,13 @@ func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Ap
 		console.NoAnsiFlag,
 		console.HelpFlag,
 		console.VerbosityFlag("verbose", "v", "v"),
+		&console.BoolFlag{
+			Name:         "yes",
+			Aliases:      []string{"y"},
+			Usage:        "Answer \"yes\" to confirmation questions; accept the default value for other questions; disable interaction",
+			DefaultValue: false,
+			Required:     false,
+		},
 	}
 
 	cmds := make([]*console.Command, 0, len(list.Commands))
@@ -215,7 +242,7 @@ func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Ap
 	return &console.Application{
 		Name:          cnf.Application.Name,
 		HelpName:      cnf.Application.Executable,
-		Usage:         "",
+		Usage:         fmt.Sprintf("The %s command line interface", cnf.Service.Name),
 		Version:       version,
 		Channel:       channel,
 		Description:   "",
@@ -227,6 +254,13 @@ func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Ap
 			newVersionCommand(cnf),
 		),
 		Flags: []console.Flag{
+			&console.BoolFlag{
+				Name:         "yes",
+				Aliases:      []string{"y"},
+				Usage:        "Answer \"yes\" to confirmation questions; accept the default value for other questions; disable interaction",
+				DefaultValue: false,
+				Required:     false,
+			},
 			&console.StringFlag{
 				Name:  "phar-path",
 				Usage: "Use a custom legacy CLI by providing its path in your filesystem",
