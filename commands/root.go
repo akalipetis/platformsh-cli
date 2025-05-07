@@ -149,6 +149,7 @@ func newRootCommand(cnf *config.Config, assets *vendorization.VendorAssets) *cob
 		newCompletionCommand(cnf),
 		newHelpCommand(cnf),
 		newListCommand(cnf),
+		newMCPCommand(cnf),
 		projectInitCmd,
 		validateCmd,
 		versionCommand,
