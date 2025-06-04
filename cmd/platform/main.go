@@ -1,11 +1,10 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"os"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/spf13/viper"
 
 	"github.com/platformsh/cli/commands"
@@ -13,16 +12,16 @@ import (
 )
 
 func main() {
-	log.SetOutput(color.Error)
-
 	// Load configuration.
 	cnfYAML, err := config.LoadYAML()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	cnf, err := config.FromYAML(cnfYAML)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 
 	viper.SetEnvPrefix(strings.TrimSuffix(cnf.Application.EnvPrefix, "_"))

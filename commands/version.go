@@ -39,9 +39,9 @@ func newVersionCommand(cnf *config.Config) *console.Command {
 				fmt.Fprintf(
 					color.Output,
 					"Commit %s (built %s by %s)\n",
-					color.CyanString(commit),
-					color.CyanString(date),
-					color.CyanString(builtBy),
+					color.CyanString(config.Commit),
+					color.CyanString(config.Date),
+					color.CyanString(config.BuiltBy),
 				)
 			}
 			return nil
