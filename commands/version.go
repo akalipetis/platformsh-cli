@@ -11,20 +11,12 @@ import (
 	"github.com/platformsh/cli/internal/legacy"
 )
 
-var (
-	version = "0.0.0"
-	channel = "dev"
-	date    = ""
-	commit  = "local"
-	builtBy = "local"
-)
-
 func newVersionCommand(cnf *config.Config) *console.Command {
 	return &console.Command{
 		Name:  "version",
 		Usage: "Print the version number of the " + cnf.Application.Name,
 		Action: func(_ *console.Context) error {
-			fmt.Fprintf(color.Output, "%s %s\n", cnf.Application.Name, color.CyanString(version))
+			fmt.Fprintf(color.Output, "%s %s\n", cnf.Application.Name, color.CyanString(config.Version))
 			if terminal.GetLogLevel() > 1 {
 				fmt.Fprintf(
 					color.Output,

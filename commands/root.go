@@ -10,7 +10,9 @@ import (
 	"text/tabwriter"
 	"text/template"
 
+	"github.com/fatih/color"
 	"github.com/platformsh/platformify/vendorization"
+	"github.com/spf13/viper"
 	"github.com/symfony-cli/console"
 	"github.com/symfony-cli/terminal"
 
@@ -85,7 +87,7 @@ func Execute(cnf *config.Config) error {
 
 			for _, legacyCmd := range list.Commands {
 				if cmd.Name == legacyCmd.Name.Command && len(legacyCmd.Examples) > 0 {
-					et.Execute(w, legacyCmd)
+					_ = et.Execute(w, legacyCmd)
 				}
 			}
 		}
@@ -100,19 +102,8 @@ func Execute(cnf *config.Config) error {
 }
 
 func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Application, error) {
-	legacyAction := func(ctx *console.Context) error {
-		c := &legacy.CLIWrapper{
-			Config:         cnf,
-			Version:        version,
-			CustomPharPath: ctx.String("phar-path"),
-			Stdout:         os.Stdout,
-			Stderr:         os.Stderr,
-			Stdin:          os.Stdin,
-		}
-		if legacyErr := c.Init(); legacyErr != nil {
-			terminal.Logger.Debug().Msgf("failed to initialize legacy CLI: %s", legacyErr)
-			return fmt.Errorf("Failed to initialize legacy CLI")
-		}
+	legacyAction := func(_ *console.Context) error {
+		c := makeLegacyCLIWrapper(cnf, os.Stdout, os.Stderr, os.Stdin)
 
 		if legacyErr := c.Exec(context.TODO(), os.Args[1:]...); legacyErr != nil {
 			terminal.Logger.Debug().Msgf("failed to run legacy CLI command: %s", legacyErr)
@@ -142,9 +133,10 @@ func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Ap
 		console.HelpFlag,
 		console.VerbosityFlag("verbose", "v", "v"),
 		&console.BoolFlag{
-			Name:         "yes",
-			Aliases:      []string{"y"},
-			Usage:        "Answer \"yes\" to confirmation questions; accept the default value for other questions; disable interaction",
+			Name:    "yes",
+			Aliases: []string{"y"},
+			Usage: "Answer \"yes\" to confirmation questions; accept the default value for other questions; " +
+				"disable interaction",
 			DefaultValue: false,
 			Required:     false,
 		},
@@ -243,8 +235,7 @@ func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Ap
 		Name:          cnf.Application.Name,
 		HelpName:      cnf.Application.Executable,
 		Usage:         fmt.Sprintf("The %s command line interface", cnf.Service.Name),
-		Version:       version,
-		Channel:       channel,
+		Version:       cnf.Metadata.Version,
 		Description:   "",
 		FlagEnvPrefix: []string{strings.TrimRight(cnf.Application.EnvPrefix, "_")},
 		Commands: append(
@@ -255,9 +246,10 @@ func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Ap
 		),
 		Flags: []console.Flag{
 			&console.BoolFlag{
-				Name:         "yes",
-				Aliases:      []string{"y"},
-				Usage:        "Answer \"yes\" to confirmation questions; accept the default value for other questions; disable interaction",
+				Name:    "yes",
+				Aliases: []string{"y"},
+				Usage: "Answer \"yes\" to confirmation questions; accept the default value for other questions; " +
+					"disable interaction",
 				DefaultValue: false,
 				Required:     false,
 			},
@@ -267,4 +259,24 @@ func newApp(cnf *config.Config, assets *vendorization.VendorAssets) (*console.Ap
 			},
 		},
 	}, nil
+}
+func debugLog(format string, v ...any) {
+	if !viper.GetBool("debug") {
+		return
+	}
+
+	prefix := color.New(color.ReverseVideo).Sprintf("DEBUG")
+	fmt.Fprintf(color.Error, prefix+" "+strings.TrimSpace(format)+"\n", v...)
+}
+
+func makeLegacyCLIWrapper(cnf *config.Config, stdout, stderr io.Writer, stdin io.Reader) *legacy.CLIWrapper {
+	return &legacy.CLIWrapper{
+		Config:             cnf,
+		Version:            config.Version,
+		DebugLogFunc:       debugLog,
+		DisableInteraction: viper.GetBool("no-interaction"),
+		Stdout:             stdout,
+		Stderr:             stderr,
+		Stdin:              stdin,
+	}
 }

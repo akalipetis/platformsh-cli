@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/platformsh/cli/internal/config"
-	"github.com/platformsh/cli/internal/legacy"
 )
 
 func listLegacyCommands(ctx context.Context, cnf *config.Config, category string, all bool) (*List, error) {
@@ -20,17 +19,7 @@ func listLegacyCommands(ctx context.Context, cnf *config.Config, category string
 	}
 
 	var b bytes.Buffer
-	c := &legacy.CLIWrapper{
-		Config:  cnf,
-		Version: version,
-		Stdout:  &b,
-		Stderr:  nil,
-		Stdin:   nil,
-	}
-
-	if err := c.Init(); err != nil {
-		return nil, fmt.Errorf("could not initialize legacy CLI: %w", err)
-	}
+	c := makeLegacyCLIWrapper(cnf, &b, nil, nil)
 
 	if err := c.Exec(ctx, arguments...); err != nil {
 		return nil, fmt.Errorf("could not list legacy CLI commands: %w", err)

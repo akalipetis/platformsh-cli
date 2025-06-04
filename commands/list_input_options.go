@@ -8,20 +8,6 @@ import (
 	"github.com/platformsh/cli/internal/config"
 )
 
-func globalOptions(cnf *config.Config) []Option {
-	return []Option{
-		HelpOption,
-		VerboseOption,
-		VersionOption,
-		YesOption,
-		NoInteractionOption(cnf),
-		AnsiOption,
-		NoAnsiOption,
-		NoOption,
-		QuietOption,
-	}
-}
-
 func NoInteractionOption(cnf *config.Config) Option {
 	return Option{
 		Name:            "--no-interaction",
